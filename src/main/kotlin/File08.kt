@@ -1,6 +1,4 @@
 import Challenge08.Operation.*
-import Challenge08.Result.Fail
-import Challenge08.Result.Success
 import java.io.File
 import java.nio.charset.StandardCharsets.UTF_8
 
@@ -9,7 +7,7 @@ private class Challenge08 {
     enum class Operation { acc, jmp, nop }
     enum class Mode { ALLOW_MODIFY, NO_MODIFY }
 
-    data class Instruction(val index: Int, val op: Operation, val value: Int, val changed: Boolean = false) {
+    data class Instruction(val index: Int, val op: Operation, val value: Int) {
         constructor(index: Int, line: String) : this(
             index,
             valueOf(line.substring(0, 3)),
@@ -30,26 +28,21 @@ private class Challenge08 {
 
     fun findAnswer1v1(): Int = findBeforeLoop(instructions[0]).map { it.accContr }.sum()
 
-    open class Result(open val seen: List<Instruction> = emptyList()) {
-        data class Fail(override val seen: List<Instruction> = emptyList()) : Result(seen)
-        data class Success(override val seen: List<Instruction> = emptyList()) : Result(seen)
-    }
-
     private fun findModifiedSolution(current: Instruction, seen: List<Instruction>, mode: Mode) =
-        if (mode == Mode.NO_MODIFY) Fail() else when (current.op) {
-            acc -> Fail()
-            jmp -> current.copy(op = nop, changed = true).let { findWorking(it, Mode.NO_MODIFY, seen) }
-            nop -> current.copy(op = jmp, changed = true).let { findWorking(it, Mode.NO_MODIFY, seen) }
+        if (mode == Mode.NO_MODIFY) null else when (current.op) {
+            acc -> null
+            jmp -> current.copy(op = nop).let { findWorking(it, Mode.NO_MODIFY, seen) }
+            nop -> current.copy(op = jmp).let { findWorking(it, Mode.NO_MODIFY, seen) }
         }
 
-    fun findWorking(current: Instruction, mode: Mode, seen: List<Instruction> = listOf(current)): Result {
-        findModifiedSolution(current, seen, mode).let { if (it is Success) return it }
-        if (instructions.size <= current.nextIndex) return Success(seen)
+    fun findWorking(current: Instruction, mode: Mode, seen: List<Instruction> = listOf(current)): List<Instruction>? {
+        findModifiedSolution(current, seen, mode)?.let { return it }
+        if (instructions.size <= current.nextIndex) return seen
         val next = instructions[current.nextIndex]
-        return if (seen.contains(next)) return Fail() else findWorking(next, mode, seen + next)
+        return if (seen.contains(next)) return null else findWorking(next, mode, seen + next)
     }
 
-    fun findAnswer2v1(): Int = findWorking(instructions[0], Mode.ALLOW_MODIFY).seen.map { it.accContr }.sum()
+    fun findAnswer2v1(): Int = findWorking(instructions[0], Mode.ALLOW_MODIFY)?.map { it.accContr }?.sum() ?: 0
 
     fun solve() {
         println(findAnswer1v1())
